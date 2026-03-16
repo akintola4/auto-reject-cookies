@@ -99,5 +99,28 @@ document.getElementById("resetBtn").addEventListener("click", async () => {
   loadStats();
 });
 
+// Toggle switch
+const toggleSwitch = document.getElementById("toggleSwitch");
+const statusDot = document.getElementById("statusDot");
+const statusText = document.getElementById("statusText");
+
+function updateToggleUI(enabled) {
+  toggleSwitch.checked = enabled;
+  statusText.textContent = enabled ? "Active" : "Off";
+  statusDot.classList.toggle("off", !enabled);
+}
+
+// Load initial state
+chrome.storage.local.get("enabled", (result) => {
+  const enabled = result.enabled !== false; // default to true
+  updateToggleUI(enabled);
+});
+
+toggleSwitch.addEventListener("change", async () => {
+  const enabled = toggleSwitch.checked;
+  await chrome.storage.local.set({ enabled });
+  updateToggleUI(enabled);
+});
+
 // Load on open
 loadStats();

@@ -313,9 +313,25 @@
     }
   }
 
+  // ─── Check enabled state before running ──────────────────────────────────
+  function start() {
+    chrome.storage.local.get("enabled", (result) => {
+      if (result.enabled === false) return; // disabled, do nothing
+      init();
+    });
+  }
+
+  // Listen for toggle changes to stop observer if disabled mid-page
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.enabled && changes.enabled.newValue === false) {
+      observer.disconnect();
+      clearTimeout(debounceTimer);
+    }
+  });
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", start);
   } else {
-    init();
+    start();
   }
 })();

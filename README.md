@@ -31,9 +31,21 @@ A Chrome extension that automatically finds and clicks "Reject All" / "Decline" 
 - Tracks per-site rejection counts
 - Shows failed rejections so you know which sites need manual action
 - Light/dark theme follows your OS preference
+- On/off toggle switch to enable or disable the extension
 - Minimal, clean popup UI
 
 ## Changelog
+
+### v1.1.0
+
+**On/off toggle switch**
+
+![Toggle Switch](screenshots/toggle-switch.png)
+
+- Added on/off toggle switch in the popup header to enable or disable the extension
+- Badge shows "OFF" when disabled
+- Content script respects the toggle and stops scanning when disabled mid-page
+- Extension defaults to enabled on fresh install
 
 ### v1.0.0
 

@@ -72,6 +72,49 @@
       height: 6px;
       border-radius: 50%;
       background: var(--accent);
+      transition: background 0.2s;
+    }
+    .status-dot.off {
+      background: var(--muted);
+    }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 32px;
+      height: 18px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 9px;
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track {
+      background: var(--accent);
+    }
+    .toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle-knob {
+      transform: translateX(14px);
     }
 
     .hero {
@@ -207,8 +250,13 @@
   <div class="header">
     <span class="title">Cookie Cutter</span>
     <div class="status">
-      <div class="status-dot"></div>
-      Active
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Active</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggleSwitch" checked>
+        <div class="toggle-track"></div>
+        <div class="toggle-knob"></div>
+      </label>
     </div>
   </div>
 
