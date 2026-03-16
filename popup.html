@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Auto Reject Cookies</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --text: #111;
+      --muted: #999;
+      --accent: #16a34a;
+      --border: #eee;
+      --danger: #b91c1c;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141414;
+        --text: #e5e5e5;
+        --muted: #666;
+        --accent: #4ade80;
+        --border: #252525;
+        --danger: #ef4444;
+      }
+    }
+
+    body {
+      width: 280px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Sora', sans-serif;
+      font-size: 12px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .hero {
+      padding: 28px 20px 20px;
+      text-align: center;
+    }
+    .hero-number {
+      font-size: 48px;
+      font-weight: 600;
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+    .hero-label {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 300;
+    }
+
+    .sub-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding-bottom: 20px;
+    }
+    .sub-stat { text-align: center; }
+    .sub-number {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+    .sub-label {
+      margin-top: 3px;
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 300;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 20px;
+    }
+
+    .section {
+      padding: 14px 20px 10px;
+    }
+    .section-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+      font-weight: 400;
+    }
+    .site-list {
+      display: flex;
+      flex-direction: column;
+    }
+    .site-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .site-item:last-child { border-bottom: none; }
+    .site-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .site-time {
+      font-size: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .check-icon {
+      color: var(--accent);
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .fail-icon {
+      color: var(--danger);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .site-item.failed .site-name {
+      color: var(--muted);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 20px 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .reset-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+      font-family: 'Sora', sans-serif;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .reset-btn:hover { color: var(--danger); }
+    .version {
+      font-size: 10px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="title">Auto Reject</span>
+    <div class="status">
+      <div class="status-dot"></div>
+      Active
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-number" id="totalCount">&mdash;</div>
+    <div class="hero-label">banners rejected</div>
+  </div>
+
+  <div class="sub-stats">
+    <div class="sub-stat">
+      <div class="sub-number" id="todayCount">&mdash;</div>
+      <div class="sub-label">today</div>
+    </div>
+    <div class="sub-stat">
+      <div class="sub-number" id="siteCount">&mdash;</div>
+      <div class="sub-label">sites</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <div class="section-label">Recent</div>
+    <div class="site-list" id="siteList">
+      <div class="empty">No banners rejected yet.<br>Browse the web to get started.</div>
+    </div>
+  </div>
+
+  <div class="section" id="failedSection" style="display:none">
+    <div class="section-label">Failed</div>
+    <div class="site-list" id="failedList"></div>
+  </div>
+
+  <div class="footer">
+    <button class="reset-btn" id="resetBtn">Reset</button>
+    <span class="version">v1.0.0</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

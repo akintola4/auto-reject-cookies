@@ -1,0 +1,321 @@
+// Auto Reject Cookies - Content Script
+// Runs on every page to detect and reject cookie consent banners
+
+(function () {
+  "use strict";
+
+  // ─── Reject button text patterns (case-insensitive) ───────────────────────
+  const REJECT_TEXTS = [
+    "reject all",
+    "decline all",
+    "deny all",
+    "refuse all",
+    "reject cookies",
+    "decline cookies",
+    "i decline",
+    "no thanks",
+    "no, thanks",
+    "don't accept",
+    "do not accept",
+    "only necessary",
+    "only essential",
+    "necessary only",
+    "essential only",
+    "use necessary",
+    "reject",
+    "decline",
+  ];
+
+  // ─── Common CMP container selectors ───────────────────────────────────────
+  const BANNER_SELECTORS = [
+    // Generic
+    "#cookie-banner",
+    "#cookie-consent",
+    "#cookie-notice",
+    "#cookie-popup",
+    "#cookie-modal",
+    "#cookieBanner",
+    "#cookieConsent",
+    "#cookieNotice",
+    ".cookie-banner",
+    ".cookie-consent",
+    ".cookie-notice",
+    ".cookie-popup",
+    ".cookie-bar",
+    ".cookie-modal",
+    ".cookies-banner",
+    ".cookies-consent",
+    // OneTrust
+    "#onetrust-banner-sdk",
+    "#onetrust-consent-sdk",
+    ".onetrust-pc-dark-filter",
+    // Cookiebot
+    "#CybotCookiebotDialog",
+    "#cookiebotDialogBody",
+    // TrustArc
+    ".truste_overlay",
+    ".truste_box_overlay",
+    "#truste-consent-track",
+    // Quantcast
+    ".qc-cmp2-container",
+    "#qc-cmp2-ui",
+    // Didomi
+    "#didomi-host",
+    ".didomi-popup-container",
+    // Iubenda
+    "#iubenda-cs-banner",
+    ".iubenda-cs-container",
+    // Osano
+    ".osano-cm-window",
+    ".osano-cm-dialog",
+    // Civic Cookie Control
+    "#ccc",
+    ".ccc-module",
+    // GDPR Legal Cookie
+    "#gdpr-cookie-notice",
+    ".gdpr-cookie-notice",
+    // Cookie Consent by Insites / Complianz
+    ".cc-window",
+    ".cc-banner",
+    "#cmplz-cookiebanner-container",
+    ".cmplz-cookiebanner",
+    // WP Cookie Notice
+    ".cn-notice-container",
+    // Borlabs Cookie
+    "#BorlabsCookieBox",
+    ".BorlabsCookie",
+    // General GDPR/consent wrappers
+    "[class*='gdpr']",
+    "[id*='gdpr']",
+    "[class*='consent']",
+    "[id*='consent']",
+    "[class*='cookie-law']",
+    "[id*='cookie-law']",
+    "[aria-label*='cookie']",
+    "[aria-label*='Cookie']",
+    "[role='dialog'][aria-label*='cookie']",
+    "[role='dialog'][aria-label*='privacy']",
+  ];
+
+  // ─── Specific reject button selectors from known CMPs ─────────────────────
+  const REJECT_BUTTON_SELECTORS = [
+    // OneTrust
+    "#onetrust-reject-all-handler",
+    ".onetrust-close-btn-handler",
+    // Cookiebot
+    "#CybotCookiebotDialogBodyButtonDecline",
+    // TrustArc
+    ".pdynamicbutton .call",
+    "#truste-consent-required",
+    // Quantcast
+    ".qc-cmp2-summary-buttons button:first-child",
+    // Didomi
+    "#didomi-notice-disagree-button",
+    // Iubenda
+    ".iubenda-cs-reject-btn",
+    // Osano
+    ".osano-cm-denyAll",
+    ".osano-cm-decline",
+    // Complianz
+    ".cmplz-deny",
+    "#cmplz-btn-deny",
+    // Borlabs
+    ".borlabs-cookie-refuse",
+    // WP GDPR
+    ".wpgdprc-consent-bar__decline",
+    // Cookie Information
+    "#declineButton",
+    // General patterns
+    "[data-testid*='reject']",
+    "[data-testid*='decline']",
+    "[data-action='reject']",
+    "[data-action='decline']",
+    "[class*='reject-all']",
+    "[class*='decline-all']",
+    "[id*='reject-all']",
+    "[id*='decline-all']",
+  ];
+
+  let handled = false;
+  let bannerDetected = false;
+
+  // ─── Check if element is actually visible on page ─────────────────────────
+  function isVisible(el) {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+    const style = window.getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+  }
+
+  // ─── Check if text matches a reject pattern ───────────────────────────────
+  function isRejectText(text) {
+    if (!text) return false;
+    const normalized = text.trim().toLowerCase();
+    return REJECT_TEXTS.some((pattern) => normalized.includes(pattern));
+  }
+
+  // ─── Find reject button by text content ───────────────────────────────────
+  function findRejectButtonByText(container) {
+    const buttons = container.querySelectorAll(
+      "button, [role='button'], a, input[type='button'], input[type='submit']"
+    );
+    for (const btn of buttons) {
+      const text = btn.innerText || btn.value || btn.getAttribute("aria-label") || "";
+      if (isRejectText(text)) {
+        return btn;
+      }
+    }
+    return null;
+  }
+
+  // ─── Find reject button by known selectors ────────────────────────────────
+  function findRejectButtonBySelector(container) {
+    for (const sel of REJECT_BUTTON_SELECTORS) {
+      try {
+        const btn = container.querySelector(sel) || document.querySelector(sel);
+        if (btn) return btn;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  // ─── Attempt to click a reject button ────────────────────────────────────
+  function clickRejectButton(btn) {
+    if (!btn || btn.disabled) return false;
+    try {
+      btn.click();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ─── Try to handle a single banner element ───────────────────────────────
+  function tryHandleBanner(banner) {
+    if (!banner || !document.body.contains(banner)) return false;
+
+    // 1. Try known selector first (most reliable)
+    let btn = findRejectButtonBySelector(banner);
+
+    // 2. Fallback: search by text
+    if (!btn) btn = findRejectButtonByText(banner);
+
+    // 3. Fallback: search the whole document by text
+    if (!btn) btn = findRejectButtonByText(document.body);
+
+    if (btn) {
+      const success = clickRejectButton(btn);
+      if (success) {
+        notifyBackground();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ─── Scan for banners and attempt rejection ───────────────────────────────
+  function scanAndReject() {
+    if (handled) return;
+
+    for (const sel of BANNER_SELECTORS) {
+      try {
+        const banners = document.querySelectorAll(sel);
+        for (const banner of banners) {
+          if (banner && document.body.contains(banner) && isVisible(banner)) {
+            bannerDetected = true;
+          }
+          if (tryHandleBanner(banner)) {
+            handled = true;
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Last resort: scan all visible dialog/modal elements
+    const dialogs = document.querySelectorAll("[role='dialog'], [role='alertdialog']");
+    for (const dialog of dialogs) {
+      const text = (dialog.innerText || "").toLowerCase();
+      if (
+        text.includes("cookie") ||
+        text.includes("privacy") ||
+        text.includes("consent") ||
+        text.includes("gdpr")
+      ) {
+        bannerDetected = true;
+        if (tryHandleBanner(dialog)) {
+          handled = true;
+          return;
+        }
+      }
+    }
+  }
+
+  // ─── Notify background to increment stats ────────────────────────────────
+  function notifyBackground() {
+    try {
+      chrome.runtime.sendMessage({
+        type: "COOKIE_REJECTED",
+        hostname: window.location.hostname,
+        timestamp: Date.now(),
+      });
+    } catch (_) {}
+  }
+
+  function notifyBackgroundFailed() {
+    try {
+      chrome.runtime.sendMessage({
+        type: "COOKIE_FAILED",
+        hostname: window.location.hostname,
+        timestamp: Date.now(),
+      });
+    } catch (_) {}
+  }
+
+  // ─── MutationObserver to catch late-loading banners ──────────────────────
+  let debounceTimer = null;
+  const observer = new MutationObserver(() => {
+    if (handled) {
+      observer.disconnect();
+      return;
+    }
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      scanAndReject();
+    }, 300);
+  });
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+  function init() {
+    // Immediate scan
+    scanAndReject();
+
+    if (!handled) {
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: false,
+      });
+
+      // Stop observing after 15s to save resources
+      setTimeout(() => {
+        observer.disconnect();
+        // Flush any pending debounced scan before reporting failure
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          scanAndReject();
+        }
+        if (!handled && bannerDetected) {
+          notifyBackgroundFailed();
+        }
+      }, 15000);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
