@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Auto Reject Cookies",
+  "name": "Cookie Cutter",
   "version": "1.0.0",
-  "description": "Automatically rejects cookie consent banners to protect your privacy.",
+  "description": "Cookie Cutter — automatically rejects cookie consent banners so you never have to.",
   "permissions": [
     "storage",
     "scripting",
