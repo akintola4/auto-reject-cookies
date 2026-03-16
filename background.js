@@ -45,19 +45,40 @@ async function updateStats(hostname) {
   chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
 }
 
-// Initialize badge on install/startup
-chrome.runtime.onInstalled.addListener(async () => {
-  const result = await chrome.storage.local.get("totalCount");
+// ─── Badge helper ──────────────────────────────────────────────────────────
+async function refreshBadge() {
+  const result = await chrome.storage.local.get(["totalCount", "enabled"]);
+  const enabled = result.enabled !== false;
   const count = result.totalCount || 0;
-  chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
-  chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+
+  if (!enabled) {
+    chrome.action.setBadgeText({ text: "OFF" });
+    chrome.action.setBadgeBackgroundColor({ color: "#666" });
+  } else {
+    chrome.action.setBadgeText({ text: count > 0 ? (count > 999 ? "999+" : String(count)) : "" });
+    chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+  }
+}
+
+// React to toggle changes
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.enabled) {
+    refreshBadge();
+  }
 });
 
-chrome.runtime.onStartup.addListener(async () => {
-  const result = await chrome.storage.local.get("totalCount");
-  const count = result.totalCount || 0;
-  chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
-  chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+// Initialize badge on install/startup
+chrome.runtime.onInstalled.addListener(async () => {
+  // Default to enabled on fresh install
+  const result = await chrome.storage.local.get("enabled");
+  if (result.enabled === undefined) {
+    await chrome.storage.local.set({ enabled: true });
+  }
+  refreshBadge();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  refreshBadge();
 });
 
 async function trackFailure(hostname) {
