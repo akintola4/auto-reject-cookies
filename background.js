@@ -40,9 +40,8 @@ async function updateStats(hostname) {
     recentSites,
   });
 
-  // Update badge
-  chrome.action.setBadgeText({ text: totalCount > 999 ? "999+" : String(totalCount) });
-  chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+  // Update badge (respects enabled state)
+  refreshBadge();
 }
 
 // ─── Badge helper ──────────────────────────────────────────────────────────
