@@ -321,7 +321,10 @@
     });
   }
 
-  // Listen for toggle changes to stop observer if disabled mid-page
+  // Listen for toggle changes to stop observer if disabled mid-page.
+  // Intentionally does not re-enable on toggle-on: a page reload is required
+  // because the content script's handled state, timers, and observer cannot be
+  // cleanly restored mid-page.
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.enabled && changes.enabled.newValue === false) {
       observer.disconnect();
