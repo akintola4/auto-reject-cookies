@@ -212,6 +212,14 @@
     .site-item.failed .site-name {
       color: var(--muted);
     }
+    .report-link {
+      font-size: 10px;
+      color: var(--muted);
+      text-decoration: underline;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .report-link:hover { color: var(--accent); }
 
     .empty {
       text-align: center;
@@ -222,12 +230,58 @@
       font-weight: 300;
     }
 
+    .site-control {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .site-control-text {
+      font-size: 11px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .site-control-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 11px;
+      font-family: 'Sora', sans-serif;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .site-control-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 20px;
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
     .footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 10px 20px 14px;
       border-top: 1px solid var(--border);
+      position: relative;
+    }
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     .reset-btn {
       background: none;
@@ -240,6 +294,42 @@
       transition: color 0.15s;
     }
     .reset-btn:hover { color: var(--danger); }
+    .export-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+      font-family: 'Sora', sans-serif;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .export-btn:hover { color: var(--accent); }
+    .export-menu {
+      position: absolute;
+      bottom: 100%;
+      right: 20px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      min-width: 80px;
+      overflow: hidden;
+    }
+    .export-menu[hidden] { display: none; }
+    .export-menu button {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 11px;
+      font-family: 'Sora', sans-serif;
+      padding: 7px 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .export-menu button:hover { background: var(--border); color: var(--accent); }
     .version {
       font-size: 10px;
       color: var(--muted);
@@ -290,9 +380,30 @@
     <div class="site-list" id="failedList"></div>
   </div>
 
+  <div class="site-control" id="siteControl" hidden>
+    <span class="site-control-text" id="siteControlText"></span>
+    <button class="site-control-btn" id="siteControlBtn"></button>
+  </div>
+
+  <div class="settings-row">
+    <span>Hide uncloseable banners</span>
+    <label class="toggle">
+      <input type="checkbox" id="hideFallbackToggle" checked role="switch" aria-label="Hide uncloseable banners">
+      <div class="toggle-track"></div>
+      <div class="toggle-knob"></div>
+    </label>
+  </div>
+
   <div class="footer">
     <button class="reset-btn" id="resetBtn">Reset</button>
-    <span class="version">v1.1.0</span>
+    <div class="footer-right">
+      <button class="export-btn" id="exportBtn" aria-haspopup="true" aria-expanded="false">Export ▾</button>
+      <span class="version">v1.2.0</span>
+    </div>
+    <div class="export-menu" id="exportMenu" hidden>
+      <button data-fmt="json">JSON</button>
+      <button data-fmt="csv">CSV</button>
+    </div>
   </div>
 
   <script src="popup.js"></script>
