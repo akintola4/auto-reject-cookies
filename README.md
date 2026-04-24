@@ -41,7 +41,20 @@ A Chrome extension that automatically finds and clicks "Reject All" / "Decline" 
 - On/off toggle switch to enable or disable the extension
 - Minimal, clean popup UI
 
-## Contributing a CMP rule
+## Contributing
+
+Contributions are welcome — especially from people who've never contributed to open source before. The project is small, the codebase is approachable (one content script, one background service worker, one popup), and most useful PRs are just a few lines.
+
+### Finding something to work on
+
+- **[`good first issue`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — small, scoped tasks that are a natural first contribution
+- **[`cmp-support`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22cmp-support%22)** — add handling for a specific cookie banner / CMP. Usually a one-line `rules.json` change (see below)
+- **[`failed-site`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22failed-site%22)** — a specific site where the extension can't find the reject button. Each one is a real task waiting to be picked up
+- **[`help wanted`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)** — anything, regardless of size, where an extra set of hands would move things along
+
+Don't see an issue that fits? Open one — `failed-site` reports (with the URL that didn't work) and `false-positive` reports (sites where the extension clicked the wrong thing) are especially valuable.
+
+### Adding a CMP rule
 
 If a site isn't being handled, the fastest way to fix it for everyone is to add an entry to [`rules.json`](rules.json) and open a PR. The schema is:
 
@@ -55,6 +68,12 @@ If a site isn't being handled, the fastest way to fix it for everyone is to add 
 ```
 
 Overly broad selectors (`*`, `body`, `html`, anything with `:has(` or `iframe`) are rejected by the client at load time. Clicking "Report" on a failed site in the popup opens a prefilled issue so you don't have to type any of this.
+
+### Submitting a PR
+
+1. Fork the repo, create a branch (`fix/...` or `feat/...`)
+2. Load your copy via `chrome://extensions` → **Load unpacked** to test locally
+3. Open a PR against `main` — describe what site / CMP / behavior you're changing, and how a reviewer can verify it
 
 ## Changelog
 
