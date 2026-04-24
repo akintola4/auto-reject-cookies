@@ -84,6 +84,24 @@
     // Borlabs Cookie
     "#BorlabsCookieBox",
     ".BorlabsCookie",
+    // CookieYes (modern)
+    "#cky-consent",
+    "#cky-consent-container",
+    ".cky-consent-container",
+    ".cky-consent-bar",
+    "[data-cky-tag='notice']",
+    // GDPR Cookie Consent / Cookie Law Info (CookieYes legacy WordPress plugin)
+    "#cookie-law-info-bar",
+    "#cookie-law-info-again",
+    ".wt-cli-cookie-bar-container",
+    // Google / YouTube consent
+    "ytd-consent-bump-v2-lightbox",
+    "tp-yt-paper-dialog",
+    "form[action*='consent.google']",
+    "form[action*='consent.youtube']",
+    // PostHog cookie banner
+    ".ph-cookie-banner",
+    "[data-ph-feature='cookie-banner']",
     // General GDPR/consent wrappers
     "[class*='gdpr']",
     "[id*='gdpr']",
@@ -125,6 +143,18 @@
     ".wpgdprc-consent-bar__decline",
     // Cookie Information
     "#declineButton",
+    // CookieYes
+    ".cky-btn-reject",
+    "[data-cky-tag='reject-button']",
+    "[data-cky-action='reject']",
+    // Cookie Law Info / CookieYes legacy
+    "#wt-cli-reject-btn",
+    ".wt-cli-reject-btn",
+    ".cli_action_button.wt-cli-reject-btn",
+    // PostHog
+    ".ph-cookie-banner-reject",
+    "[data-ph-cookie-banner='reject']",
+    "[data-ph-cookie-action='reject']",
     // General patterns
     "[data-testid*='reject']",
     "[data-testid*='decline']",
@@ -152,9 +182,11 @@
   // Broad selectors like [class*='consent'] can match non-cookie UI on sites
   // like GitHub. Require the element to either use a known CMP id/class or
   // mention cookies/GDPR in its text before treating it as a cookie banner.
-  const CMP_KEYWORD_RE = /cookie|gdpr|cmplz|onetrust|cookiebot|didomi|iubenda|borlabs|osano|truste|qc-cmp|ccc-/i;
+  const CMP_KEYWORD_RE = /cookie|gdpr|cmplz|onetrust|cookiebot|didomi|iubenda|borlabs|osano|truste|qc-cmp|ccc-|cky-|wt-cli|ytd-consent|ph-cookie-banner/i;
   function looksLikeCookieBanner(el) {
     if (!el || !document.body.contains(el)) return false;
+    const tagName = (el.tagName || "").toLowerCase();
+    if (CMP_KEYWORD_RE.test(tagName)) return true;
     const id = el.id || "";
     const className = typeof el.className === "string" ? el.className : "";
     if (CMP_KEYWORD_RE.test(id) || CMP_KEYWORD_RE.test(className)) return true;
