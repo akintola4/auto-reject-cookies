@@ -6,7 +6,9 @@
   "permissions": [
     "storage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "tabs",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -22,6 +24,24 @@
       "all_frames": true
     }
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "gpc_ruleset",
+        "enabled": true,
+        "path": "rules/gpc.json"
+      }
+    ]
+  },
+  "commands": {
+    "toggle-enabled": {
+      "suggested_key": {
+        "default": "Alt+Shift+C",
+        "mac": "Alt+Shift+C"
+      },
+      "description": "Toggle Cookie Cutter on/off"
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

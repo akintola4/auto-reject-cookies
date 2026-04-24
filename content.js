@@ -96,7 +96,11 @@
     ".wt-cli-cookie-bar-container",
     // Google / YouTube consent
     "ytd-consent-bump-v2-lightbox",
-    "tp-yt-paper-dialog",
+    // Narrow tp-yt-paper-dialog to cookie/consent-labelled dialogs only —
+    // YouTube reuses this element for many non-consent popups.
+    "tp-yt-paper-dialog[aria-label*='cookie' i]",
+    "tp-yt-paper-dialog[aria-label*='consent' i]",
+    "ytd-consent-bump-v2-lightbox tp-yt-paper-dialog",
     "form[action*='consent.google']",
     "form[action*='consent.youtube']",
     // PostHog cookie banner
@@ -166,8 +170,65 @@
     "[id*='decline-all']",
   ];
 
+  // ─── Overlay/backdrop selectors to hide alongside the banner ─────────────
+  const OVERLAY_SELECTORS = [
+    ".onetrust-pc-dark-filter",
+    ".didomi-popup-backdrop",
+    ".qc-cmp2-container",
+    ".truste_overlay",
+    ".truste_box_overlay",
+    "[class*='cookie'][class*='overlay']",
+    "[class*='consent'][class*='backdrop']",
+  ];
+
+  // ─── Shadow DOM traversal limits ──────────────────────────────────────────
+  const MAX_SHADOW_DEPTH = 8;
+  const MAX_SHADOW_NODES = 5000;
+
+  // Active merged rule sets (populated in start() from bundled + community).
+  let mergedBannerSelectors = BANNER_SELECTORS;
+  let mergedRejectButtonSelectors = REJECT_BUTTON_SELECTORS;
+  let mergedRejectTexts = REJECT_TEXTS;
+
   let handled = false;
   let bannerDetected = false;
+  let lastDetectedBanner = null;
+  let hideFallbackEnabled = true;
+
+  // ─── Deep DOM walkers (descend into open shadow roots) ────────────────────
+  function collectShadowRoots(root, out, depth, budget) {
+    if (!root || depth > MAX_SHADOW_DEPTH || budget.n <= 0) return out;
+    out.push(root);
+    const all = root.querySelectorAll ? root.querySelectorAll("*") : [];
+    for (const el of all) {
+      if (--budget.n <= 0) return out;
+      if (el.shadowRoot) collectShadowRoots(el.shadowRoot, out, depth + 1, budget);
+    }
+    return out;
+  }
+
+  function deepQuerySelectorAll(root, selector) {
+    const roots = collectShadowRoots(root, [], 0, { n: MAX_SHADOW_NODES });
+    const results = [];
+    for (const r of roots) {
+      try {
+        const nodes = r.querySelectorAll(selector);
+        for (const n of nodes) results.push(n);
+      } catch (_) {}
+    }
+    return results;
+  }
+
+  function deepQuerySelector(root, selector) {
+    const roots = collectShadowRoots(root, [], 0, { n: MAX_SHADOW_NODES });
+    for (const r of roots) {
+      try {
+        const hit = r.querySelector(selector);
+        if (hit) return hit;
+      } catch (_) {}
+    }
+    return null;
+  }
 
   // ─── Check if element is actually visible on page ─────────────────────────
   function isVisible(el) {
@@ -201,12 +262,13 @@
   function isRejectText(text) {
     if (!text) return false;
     const normalized = text.trim().toLowerCase();
-    return REJECT_TEXTS.some((pattern) => normalized.includes(pattern));
+    return mergedRejectTexts.some((pattern) => normalized.includes(pattern));
   }
 
   // ─── Find reject button by text content ───────────────────────────────────
   function findRejectButtonByText(container) {
-    const buttons = container.querySelectorAll(
+    const buttons = deepQuerySelectorAll(
+      container,
       "button, [role='button'], a, input[type='button'], input[type='submit']"
     );
     for (const btn of buttons) {
@@ -220,9 +282,9 @@
 
   // ─── Find reject button by known selectors ────────────────────────────────
   function findRejectButtonBySelector(container) {
-    for (const sel of REJECT_BUTTON_SELECTORS) {
+    for (const sel of mergedRejectButtonSelectors) {
       try {
-        const btn = container.querySelector(sel) || document.querySelector(sel);
+        const btn = deepQuerySelector(container, sel) || deepQuerySelector(document, sel);
         if (btn) return btn;
       } catch (_) {}
     }
@@ -267,13 +329,14 @@
   function scanAndReject() {
     if (handled) return;
 
-    for (const sel of BANNER_SELECTORS) {
+    for (const sel of mergedBannerSelectors) {
       try {
-        const banners = document.querySelectorAll(sel);
+        const banners = deepQuerySelectorAll(document, sel);
         for (const banner of banners) {
           if (!banner || !document.body.contains(banner) || !isVisible(banner)) continue;
           if (!looksLikeCookieBanner(banner)) continue;
           bannerDetected = true;
+          lastDetectedBanner = banner;
           if (tryHandleBanner(banner)) {
             handled = true;
             return;
@@ -285,15 +348,50 @@
     // Last resort: scan all visible dialog/modal elements.
     // Require an explicit cookie/GDPR mention — "privacy" or "consent" alone
     // are too broad and match unrelated dialogs.
-    const dialogs = document.querySelectorAll("[role='dialog'], [role='alertdialog']");
+    const dialogs = deepQuerySelectorAll(document, "[role='dialog'], [role='alertdialog']");
     for (const dialog of dialogs) {
       if (!isVisible(dialog)) continue;
       if (!looksLikeCookieBanner(dialog)) continue;
       bannerDetected = true;
+      lastDetectedBanner = dialog;
       if (tryHandleBanner(dialog)) {
         handled = true;
         return;
       }
+    }
+  }
+
+  // Some CMPs trap scroll via inline overflow:hidden on <body>/<html>; restore
+  // that too so the page is readable when we hide the banner.
+  function hideDetectedBanner() {
+    if (!lastDetectedBanner || !document.body.contains(lastDetectedBanner)) return;
+    try {
+      lastDetectedBanner.style.setProperty("display", "none", "important");
+      document.documentElement.style.setProperty("overflow", "auto", "important");
+      document.body.style.setProperty("overflow", "auto", "important");
+      for (const sel of OVERLAY_SELECTORS) {
+        const overlays = deepQuerySelectorAll(document, sel);
+        for (const o of overlays) o.style.setProperty("display", "none", "important");
+      }
+    } catch (_) {}
+  }
+
+  // ─── Resolve the top-level host ───────────────────────────────────────────
+  // With `all_frames: true`, this script runs inside iframes too. Attribute
+  // stats to the page the user is actually visiting, not the iframe's origin
+  // (which is often a third-party CMP / ad host).
+  function topHostname() {
+    try {
+      return window.top.location.hostname;
+    } catch (_) {
+      try {
+        const anc = window.location.ancestorOrigins;
+        if (anc && anc.length) return new URL(anc[anc.length - 1]).hostname;
+      } catch (_) {}
+      try {
+        if (document.referrer) return new URL(document.referrer).hostname;
+      } catch (_) {}
+      return window.location.hostname;
     }
   }
 
@@ -302,17 +400,21 @@
     try {
       chrome.runtime.sendMessage({
         type: "COOKIE_REJECTED",
-        hostname: window.location.hostname,
+        hostname: topHostname(),
         timestamp: Date.now(),
       });
     } catch (_) {}
   }
 
   function notifyBackgroundFailed() {
+    // Only emit failures from the top frame — iframes naturally won't find the
+    // banner (it lives in a sibling/parent) and would otherwise flood the
+    // failed-sites list.
+    if (window.top !== window.self) return;
     try {
       chrome.runtime.sendMessage({
         type: "COOKIE_FAILED",
-        hostname: window.location.hostname,
+        hostname: topHostname(),
         timestamp: Date.now(),
       });
     } catch (_) {}
@@ -353,20 +455,58 @@
         }
         if (!handled && bannerDetected) {
           notifyBackgroundFailed();
+          if (hideFallbackEnabled) hideDetectedBanner();
         }
       }, 15000);
     }
   }
 
-  // ─── Check enabled state before running ──────────────────────────────────
-  function start() {
-    chrome.storage.local.get("enabled", (result) => {
-      if (result.enabled === false) return; // disabled, do nothing
-      init();
-    });
+  // Reject wildly broad or iframe-scoped selectors from community rules.
+  function isSafeSelector(s) {
+    if (typeof s !== "string") return false;
+    const trimmed = s.trim();
+    if (!trimmed || trimmed.length > 256) return false;
+    const lower = trimmed.toLowerCase();
+    if (lower === "*" || lower === "body" || lower === "html") return false;
+    if (lower.includes(":has(") || lower.includes("iframe")) return false;
+    return true;
   }
 
-  // Listen for toggle changes to stop observer if disabled mid-page.
+  function mergeCommunityRules(community) {
+    if (!community || typeof community !== "object") return;
+    const pickSelectors = (arr, cap) =>
+      Array.isArray(arr) ? arr.filter(isSafeSelector).slice(0, cap) : [];
+    const bs = pickSelectors(community.bannerSelectors, 200);
+    const rs = pickSelectors(community.rejectButtonSelectors, 200);
+    const rt = Array.isArray(community.rejectTexts)
+      ? community.rejectTexts
+          .filter((t) => typeof t === "string" && t.length > 0 && t.length <= 64)
+          .slice(0, 100)
+      : [];
+    if (bs.length) mergedBannerSelectors = Array.from(new Set([...BANNER_SELECTORS, ...bs]));
+    if (rs.length)
+      mergedRejectButtonSelectors = Array.from(new Set([...REJECT_BUTTON_SELECTORS, ...rs]));
+    if (rt.length) mergedRejectTexts = Array.from(new Set([...REJECT_TEXTS, ...rt]));
+  }
+
+  // ─── Check enabled + blocklist state before running ──────────────────────
+  function start() {
+    chrome.storage.local.get(
+      ["enabled", "blocklist", "hideFallback", "communityRules"],
+      (result) => {
+        if (result.enabled === false) return; // disabled globally
+        const host = (window.location.hostname || "").toLowerCase();
+        const blocklist = Array.isArray(result.blocklist) ? result.blocklist : [];
+        if (host && blocklist.includes(host)) return; // paused on this site
+
+        hideFallbackEnabled = result.hideFallback !== false;
+        mergeCommunityRules(result.communityRules);
+        init();
+      }
+    );
+  }
+
+  // Listen for toggle/blocklist/hideFallback changes to stop observer if disabled mid-page.
   // Intentionally does not re-enable on toggle-on: a page reload is required
   // because the content script's handled state, timers, and observer cannot be
   // cleanly restored mid-page.
@@ -374,6 +514,17 @@
     if (changes.enabled && changes.enabled.newValue === false) {
       observer.disconnect();
       clearTimeout(debounceTimer);
+      return;
+    }
+    if (changes.blocklist && Array.isArray(changes.blocklist.newValue)) {
+      const host = (window.location.hostname || "").toLowerCase();
+      if (changes.blocklist.newValue.includes(host)) {
+        observer.disconnect();
+        clearTimeout(debounceTimer);
+      }
+    }
+    if (changes.hideFallback) {
+      hideFallbackEnabled = changes.hideFallback.newValue !== false;
     }
   });
 

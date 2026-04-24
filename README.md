@@ -28,23 +28,80 @@ A Chrome extension that automatically finds and clicks "Reject All" / "Decline" 
 
 - Rejects cookie banners automatically on page load
 - Supports 40+ consent management platforms (CMPs)
-- Tracks per-site rejection counts
-- Shows failed rejections so you know which sites need manual action
+- Descends into open shadow roots to find banners in web components
+- Merges a community-maintained rules list (`rules.json`) fetched daily from this repo
+- One-click "Report" on failed sites opens a pre-filled GitHub issue
+- Per-site pause/resume from the popup
+- Hides uncloseable banners and restores scroll as a last resort
+- Sends the Global Privacy Control signal (`Sec-GPC: 1` header and `navigator.globalPrivacyControl`)
+- Keyboard shortcut to toggle on/off (default `Alt+Shift+C`, rebind at `chrome://extensions/shortcuts`)
+- Export stats as JSON or CSV
+- Tracks per-site rejection counts; shows failed rejections so you know which sites need manual action
 - Light/dark theme follows your OS preference
 - On/off toggle switch to enable or disable the extension
 - Minimal, clean popup UI
+
+## Contributing
+
+Contributions are welcome — especially from people who've never contributed to open source before. The project is small, the codebase is approachable (one content script, one background service worker, one popup), and most useful PRs are just a few lines.
+
+### Finding something to work on
+
+- **[`good first issue`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — small, scoped tasks that are a natural first contribution
+- **[`cmp-support`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22cmp-support%22)** — add handling for a specific cookie banner / CMP. Usually a one-line `rules.json` change (see below)
+- **[`failed-site`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22failed-site%22)** — a specific site where the extension can't find the reject button. Each one is a real task waiting to be picked up
+- **[`help wanted`](https://github.com/akintola4/auto-reject-cookies/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)** — anything, regardless of size, where an extra set of hands would move things along
+
+Don't see an issue that fits? Open one — `failed-site` reports (with the URL that didn't work) and `false-positive` reports (sites where the extension clicked the wrong thing) are especially valuable.
+
+### Adding a CMP rule
+
+If a site isn't being handled, the fastest way to fix it for everyone is to add an entry to [`rules.json`](rules.json) and open a PR. The schema is:
+
+```json
+{
+  "version": 1,
+  "bannerSelectors": ["#my-cmp-container"],
+  "rejectButtonSelectors": ["#my-cmp-reject-all"],
+  "rejectTexts": ["alle ablehnen"]
+}
+```
+
+Overly broad selectors (`*`, `body`, `html`, anything with `:has(` or `iframe`) are rejected by the client at load time. Clicking "Report" on a failed site in the popup opens a prefilled issue so you don't have to type any of this.
+
+### Submitting a PR
+
+1. Fork the repo, create a branch (`fix/...` or `feat/...`)
+2. Load your copy via `chrome://extensions` → **Load unpacked** to test locally
+3. Open a PR against `main` — describe what site / CMP / behavior you're changing, and how a reviewer can verify it
 
 ## Changelog
 
 ### v1.3.0
 
-**Iframe support, more CMPs, and a false-positive fix**
+**Iframe support, more CMPs, and re-hardening after v1.2**
 
 - Content script now runs in subframes (`all_frames: true`) so banners rendered inside iframes (Didomi, Quantcast, Google/YouTube consent, TrustArc, and others) can finally be reached
 - Added selectors for **CookieYes** (modern + legacy Cookie Law Info WordPress plugin), **Google / YouTube consent** (`ytd-consent-bump-v2-lightbox`, consent.google.com / consent.youtube.com forms), and **PostHog** cookie banners
-- Added a `looksLikeCookieBanner` verification step: a candidate element must use a known CMP id/class/tag or actually mention "cookie"/"cookies"/"GDPR" in its text before the extension will click anything
+- Re-applied the `looksLikeCookieBanner` verification from v1.1.x: a candidate element must use a known CMP id/class/tag or actually mention "cookie"/"cookies"/"GDPR" in its text before the extension will click anything (the v1.2 rewrite had dropped this guard)
 - Removed the document-wide text-search fallback that could click unrelated buttons (e.g. "Decline invitation" on a GitHub profile, causing redirects)
 - Tightened the `role="dialog"` last-resort scan to require an explicit cookie/GDPR mention rather than just "privacy" or "consent"
+- Narrowed the `tp-yt-paper-dialog` selector to `tp-yt-paper-dialog[aria-label*='cookie' i]` so YouTube's non-consent dialogs don't match
+- Frame-aware reporting: iframes resolve the top-level host for stats, and `COOKIE_FAILED` is only emitted from the top frame so noisy iframe misses don't pollute the failed-sites list
+
+### v1.2.0
+
+**Community rules, GPC, shortcuts, and more control**
+
+- Shadow DOM traversal (open roots) for banners inside web components
+- Community rules: fetches and merges `rules.json` from the repo every 24h with strict validation
+- Report failed sites directly to GitHub Issues from the popup (hostname, UA, and version only — no tab URL, no PII)
+- Per-site pause/resume ("Pause here" / "Resume") from the popup
+- Last-resort banner hiding after 15s if rejection fails, with body-overflow restoration (toggle in popup)
+- Global Privacy Control: sends `Sec-GPC: 1` request header and sets `navigator.globalPrivacyControl = true`
+- Keyboard shortcut to toggle on/off (default `Alt+Shift+C`; rebind at `chrome://extensions/shortcuts`)
+- Export stats as JSON or CSV
+- New permissions: `declarativeNetRequest` (for the GPC header) and `tabs` (for per-site pause)
 
 ### v1.1.0
 
