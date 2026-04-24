@@ -36,7 +36,7 @@ A Chrome extension that automatically finds and clicks "Reject All" / "Decline" 
 
 ## Changelog
 
-### v1.2.0
+### v1.3.0
 
 **Iframe support, more CMPs, and a false-positive fix**
 
