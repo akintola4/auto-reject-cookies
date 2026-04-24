@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "bannerSelectors": [
+    "#usercentrics-root",
+    ".fc-consent-root",
+    "#cmp-container",
+    "[id^='sp_message_container_']"
+  ],
+  "rejectButtonSelectors": [
+    "[data-testid='uc-deny-all-button']",
+    ".fc-cta-do-not-consent",
+    "button[mode='secondary'][data-qa='reject-all']"
+  ],
+  "rejectTexts": [
+    "ablehnen",
+    "alle ablehnen",
+    "rechazar",
+    "rechazar todo",
+    "rifiuta",
+    "rifiuta tutto",
+    "refuser",
+    "tout refuser",
+    "weigeren",
+    "alles weigeren",
+    "odrzuć",
+    "odrzuć wszystko",
+    "recusar",
+    "recusar tudo",
+    "拒绝",
+    "拒绝所有",
+    "拒絕",
+    "拒否"
+  ]
+}

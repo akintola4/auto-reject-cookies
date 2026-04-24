@@ -1,5 +1,8 @@
 // Auto Reject Cookies - Popup Script
 
+const GH_OWNER = "akintola4";
+const GH_REPO = "auto-reject-cookies";
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -75,12 +78,185 @@ async function loadStats() {
       <div class="site-item failed">
         <span class="site-name">${escapeHtml(site.hostname)}</span>
         <span class="site-time">${timeAgo(site.timestamp)}</span>
+        <a class="report-link" href="#" data-host="${escapeHtml(site.hostname)}">Report</a>
         <span class="fail-icon">✕</span>
       </div>`
       )
       .join("");
   }
 }
+
+// ─── Report a failed site to GitHub Issues ─────────────────────────────────
+function openReportIssue(hostname) {
+  const version = chrome.runtime.getManifest().version;
+  const title = `Failed site: ${hostname}`;
+  const body = [
+    `**Hostname:** ${hostname}`,
+    `**Extension version:** ${version}`,
+    `**User agent:** ${navigator.userAgent}`,
+    `**Reported at:** ${new Date().toISOString()}`,
+    ``,
+    `<!-- This report was generated from the Cookie Cutter popup. No data other than what is shown above was included. -->`,
+  ].join("\n");
+  const url =
+    `https://github.com/${GH_OWNER}/${GH_REPO}/issues/new` +
+    `?title=${encodeURIComponent(title)}` +
+    `&body=${encodeURIComponent(body)}` +
+    `&labels=${encodeURIComponent("failed-site")}`;
+  chrome.tabs.create({ url });
+}
+
+document.getElementById("failedList").addEventListener("click", (e) => {
+  const a = e.target.closest(".report-link");
+  if (!a) return;
+  e.preventDefault();
+  openReportIssue(a.dataset.host);
+});
+
+// ─── Per-site pause/resume control ─────────────────────────────────────────
+async function getActiveHostname() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.url) return null;
+    const u = new URL(tab.url);
+    if (!/^https?:$/.test(u.protocol)) return null;
+    return u.hostname.toLowerCase();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function renderSiteControl() {
+  const el = document.getElementById("siteControl");
+  const txt = document.getElementById("siteControlText");
+  const btn = document.getElementById("siteControlBtn");
+  const host = await getActiveHostname();
+  if (!host) {
+    el.hidden = true;
+    return;
+  }
+  const { blocklist = [] } = await chrome.storage.local.get("blocklist");
+  const paused = blocklist.includes(host);
+  el.hidden = false;
+  txt.textContent = paused ? `Paused on ${host}` : host;
+  btn.textContent = paused ? "Resume" : "Pause here";
+  btn.onclick = async () => {
+    const { blocklist: current = [] } = await chrome.storage.local.get("blocklist");
+    const set = new Set(current);
+    if (paused) set.delete(host);
+    else set.add(host);
+    await chrome.storage.local.set({ blocklist: Array.from(set) });
+    renderSiteControl();
+  };
+}
+
+// ─── Hide-uncloseable-banners toggle ───────────────────────────────────────
+const hideFallbackToggle = document.getElementById("hideFallbackToggle");
+chrome.storage.local.get("hideFallback", (result) => {
+  hideFallbackToggle.checked = result.hideFallback !== false;
+});
+hideFallbackToggle.addEventListener("change", async () => {
+  await chrome.storage.local.set({ hideFallback: hideFallbackToggle.checked });
+});
+
+// ─── Export stats ──────────────────────────────────────────────────────────
+function csvEscape(value) {
+  const s = String(value ?? "");
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+async function buildExportPayload() {
+  const result = await chrome.storage.local.get([
+    "totalCount",
+    "todayCount",
+    "todayKey",
+    "recentSites",
+    "failedSites",
+    "blocklist",
+  ]);
+  return {
+    exportedAt: new Date().toISOString(),
+    version: chrome.runtime.getManifest().version,
+    totalCount: result.totalCount || 0,
+    todayCount: result.todayCount || 0,
+    todayKey: result.todayKey || "",
+    recentSites: result.recentSites || [],
+    failedSites: result.failedSites || [],
+    blocklist: result.blocklist || [],
+  };
+}
+
+function downloadBlob(filename, mime, content) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function dateStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+async function exportJson() {
+  const payload = await buildExportPayload();
+  downloadBlob(
+    `cookie-cutter-stats-${dateStamp()}.json`,
+    "application/json",
+    JSON.stringify(payload, null, 2)
+  );
+}
+
+async function exportCsv() {
+  const payload = await buildExportPayload();
+  const headerMeta =
+    `# totalCount=${payload.totalCount}, todayCount=${payload.todayCount},` +
+    ` exportedAt=${payload.exportedAt}, version=${payload.version}`;
+  const rows = [
+    headerMeta,
+    "status,hostname,timestamp_iso",
+    ...payload.recentSites.map(
+      (s) => `success,${csvEscape(s.hostname)},${new Date(s.timestamp).toISOString()}`
+    ),
+    ...payload.failedSites.map(
+      (s) => `failed,${csvEscape(s.hostname)},${new Date(s.timestamp).toISOString()}`
+    ),
+  ];
+  downloadBlob(`cookie-cutter-stats-${dateStamp()}.csv`, "text/csv", rows.join("\n"));
+}
+
+const exportBtn = document.getElementById("exportBtn");
+const exportMenu = document.getElementById("exportMenu");
+
+exportBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const show = exportMenu.hasAttribute("hidden");
+  if (show) exportMenu.removeAttribute("hidden");
+  else exportMenu.setAttribute("hidden", "");
+  exportBtn.setAttribute("aria-expanded", show ? "true" : "false");
+});
+
+document.addEventListener("click", () => {
+  exportMenu.setAttribute("hidden", "");
+  exportBtn.setAttribute("aria-expanded", "false");
+});
+
+exportMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-fmt]");
+  if (!btn) return;
+  if (btn.dataset.fmt === "json") exportJson();
+  else if (btn.dataset.fmt === "csv") exportCsv();
+  exportMenu.setAttribute("hidden", "");
+  exportBtn.setAttribute("aria-expanded", "false");
+});
 
 // Reset button
 document.getElementById("resetBtn").addEventListener("click", async () => {
@@ -124,3 +300,4 @@ toggleSwitch.addEventListener("change", async () => {
 
 // Load on open
 loadStats();
+renderSiteControl();
