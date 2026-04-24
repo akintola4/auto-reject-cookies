@@ -148,6 +148,23 @@
     return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
   }
 
+  // ─── Verify element is actually a cookie banner (not a false positive) ────
+  // Broad selectors like [class*='consent'] can match non-cookie UI on sites
+  // like GitHub. Require the element to either use a known CMP id/class or
+  // mention cookies/GDPR in its text before treating it as a cookie banner.
+  const CMP_KEYWORD_RE = /cookie|gdpr|cmplz|onetrust|cookiebot|didomi|iubenda|borlabs|osano|truste|qc-cmp|ccc-/i;
+  function looksLikeCookieBanner(el) {
+    if (!el || !document.body.contains(el)) return false;
+    const id = el.id || "";
+    const className = typeof el.className === "string" ? el.className : "";
+    if (CMP_KEYWORD_RE.test(id) || CMP_KEYWORD_RE.test(className)) return true;
+    const aria = el.getAttribute && (el.getAttribute("aria-label") || "");
+    if (aria && /cookie|gdpr/i.test(aria)) return true;
+    const text = (el.innerText || "").toLowerCase();
+    if (!text || text.length > 3000) return false;
+    return /\bcookies?\b/.test(text) || /\bgdpr\b/.test(text);
+  }
+
   // ─── Check if text matches a reject pattern ───────────────────────────────
   function isRejectText(text) {
     if (!text) return false;
@@ -198,11 +215,11 @@
     // 1. Try known selector first (most reliable)
     let btn = findRejectButtonBySelector(banner);
 
-    // 2. Fallback: search by text
+    // 2. Fallback: search by text within the banner only.
+    // Do NOT fall back to scanning document.body — single-word patterns like
+    // "reject"/"decline" match legitimate buttons on many sites (e.g. GitHub's
+    // "Decline invitation"), causing unwanted clicks and redirects.
     if (!btn) btn = findRejectButtonByText(banner);
-
-    // 3. Fallback: search the whole document by text
-    if (!btn) btn = findRejectButtonByText(document.body);
 
     if (btn) {
       const success = clickRejectButton(btn);
@@ -222,9 +239,9 @@
       try {
         const banners = document.querySelectorAll(sel);
         for (const banner of banners) {
-          if (banner && document.body.contains(banner) && isVisible(banner)) {
-            bannerDetected = true;
-          }
+          if (!banner || !document.body.contains(banner) || !isVisible(banner)) continue;
+          if (!looksLikeCookieBanner(banner)) continue;
+          bannerDetected = true;
           if (tryHandleBanner(banner)) {
             handled = true;
             return;
@@ -233,21 +250,17 @@
       } catch (_) {}
     }
 
-    // Last resort: scan all visible dialog/modal elements
+    // Last resort: scan all visible dialog/modal elements.
+    // Require an explicit cookie/GDPR mention — "privacy" or "consent" alone
+    // are too broad and match unrelated dialogs.
     const dialogs = document.querySelectorAll("[role='dialog'], [role='alertdialog']");
     for (const dialog of dialogs) {
-      const text = (dialog.innerText || "").toLowerCase();
-      if (
-        text.includes("cookie") ||
-        text.includes("privacy") ||
-        text.includes("consent") ||
-        text.includes("gdpr")
-      ) {
-        bannerDetected = true;
-        if (tryHandleBanner(dialog)) {
-          handled = true;
-          return;
-        }
+      if (!isVisible(dialog)) continue;
+      if (!looksLikeCookieBanner(dialog)) continue;
+      bannerDetected = true;
+      if (tryHandleBanner(dialog)) {
+        handled = true;
+        return;
       }
     }
   }
