@@ -36,6 +36,16 @@ A Chrome extension that automatically finds and clicks "Reject All" / "Decline" 
 
 ## Changelog
 
+### v1.2.0
+
+**Iframe support, more CMPs, and a false-positive fix**
+
+- Content script now runs in subframes (`all_frames: true`) so banners rendered inside iframes (Didomi, Quantcast, Google/YouTube consent, TrustArc, and others) can finally be reached
+- Added selectors for **CookieYes** (modern + legacy Cookie Law Info WordPress plugin), **Google / YouTube consent** (`ytd-consent-bump-v2-lightbox`, consent.google.com / consent.youtube.com forms), and **PostHog** cookie banners
+- Added a `looksLikeCookieBanner` verification step: a candidate element must use a known CMP id/class/tag or actually mention "cookie"/"cookies"/"GDPR" in its text before the extension will click anything
+- Removed the document-wide text-search fallback that could click unrelated buttons (e.g. "Decline invitation" on a GitHub profile, causing redirects)
+- Tightened the `role="dialog"` last-resort scan to require an explicit cookie/GDPR mention rather than just "privacy" or "consent"
+
 ### v1.1.0
 
 **On/off toggle switch**
