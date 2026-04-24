@@ -34,7 +34,7 @@ A Chrome extension that automatically finds and clicks "Reject All" / "Decline" 
 - Per-site pause/resume from the popup
 - Hides uncloseable banners and restores scroll as a last resort
 - Sends the Global Privacy Control signal (`Sec-GPC: 1` header and `navigator.globalPrivacyControl`)
-- Keyboard shortcut to toggle on/off (default `Alt+Shift+C`, rebind at `chrome://extensions/shortcuts`)
+- Keyboard shortcut to toggle on/off (default `Alt+Shift+C` on Windows/Linux, `⌘⇧Y` on macOS; rebind at `chrome://extensions/shortcuts`)
 - Export stats as JSON or CSV
 - Tracks per-site rejection counts; shows failed rejections so you know which sites need manual action
 - Light/dark theme follows your OS preference
@@ -68,7 +68,7 @@ Overly broad selectors (`*`, `body`, `html`, anything with `:has(` or `iframe`) 
 - Per-site pause/resume ("Pause here" / "Resume") from the popup
 - Last-resort banner hiding after 15s if rejection fails, with body-overflow restoration (toggle in popup)
 - Global Privacy Control: sends `Sec-GPC: 1` request header and sets `navigator.globalPrivacyControl = true`
-- Keyboard shortcut to toggle on/off (default `Alt+Shift+C`; rebind at `chrome://extensions/shortcuts`)
+- Keyboard shortcut to toggle on/off (default `Alt+Shift+C` on Windows/Linux, `Command+Shift+Y` on macOS; rebind at `chrome://extensions/shortcuts`)
 - Export stats as JSON or CSV
 - New permissions: `declarativeNetRequest` (for the GPC header) and `tabs` (for per-site pause)
 
