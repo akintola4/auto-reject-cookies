@@ -6,8 +6,31 @@ const GH_REPO = "auto-reject-cookies";
 const RULES_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/rules.json`;
 const RULES_FETCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+// With content scripts running in all frames, a single banner rejection can
+// fire COOKIE_REJECTED from multiple frames on the same tab. Collapse
+// duplicates within a short window keyed by tabId + hostname.
+const REJECT_DEDUP_WINDOW_MS = 2000;
+const recentRejects = new Map(); // `${tabId}|${hostname}` → timestamp
+
+function shouldAcceptReject(tabId, hostname) {
+  const key = `${tabId == null ? "-" : tabId}|${hostname}`;
+  const now = Date.now();
+  const last = recentRejects.get(key) || 0;
+  if (now - last < REJECT_DEDUP_WINDOW_MS) return false;
+  recentRejects.set(key, now);
+  // Prune stale entries opportunistically.
+  if (recentRejects.size > 500) {
+    for (const [k, t] of recentRejects) {
+      if (now - t > REJECT_DEDUP_WINDOW_MS * 10) recentRejects.delete(k);
+    }
+  }
+  return true;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "COOKIE_REJECTED") {
+    const tabId = sender && sender.tab ? sender.tab.id : null;
+    if (!shouldAcceptReject(tabId, message.hostname)) return;
     updateStats(message.hostname);
   } else if (message.type === "COOKIE_FAILED") {
     trackFailure(message.hostname);

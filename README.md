@@ -77,6 +77,18 @@ Overly broad selectors (`*`, `body`, `html`, anything with `:has(` or `iframe`) 
 
 ## Changelog
 
+### v1.3.0
+
+**Iframe support, more CMPs, and re-hardening after v1.2**
+
+- Content script now runs in subframes (`all_frames: true`) so banners rendered inside iframes (Didomi, Quantcast, Google/YouTube consent, TrustArc, and others) can finally be reached
+- Added selectors for **CookieYes** (modern + legacy Cookie Law Info WordPress plugin), **Google / YouTube consent** (`ytd-consent-bump-v2-lightbox`, consent.google.com / consent.youtube.com forms), and **PostHog** cookie banners
+- Re-applied the `looksLikeCookieBanner` verification from v1.1.x: a candidate element must use a known CMP id/class/tag or actually mention "cookie"/"cookies"/"GDPR" in its text before the extension will click anything (the v1.2 rewrite had dropped this guard)
+- Removed the document-wide text-search fallback that could click unrelated buttons (e.g. "Decline invitation" on a GitHub profile, causing redirects)
+- Tightened the `role="dialog"` last-resort scan to require an explicit cookie/GDPR mention rather than just "privacy" or "consent"
+- Narrowed the `tp-yt-paper-dialog` selector to `tp-yt-paper-dialog[aria-label*='cookie' i]` so YouTube's non-consent dialogs don't match
+- Frame-aware reporting: iframes resolve the top-level host for stats, and `COOKIE_FAILED` is only emitted from the top frame so noisy iframe misses don't pollute the failed-sites list
+
 ### v1.2.0
 
 **Community rules, GPC, shortcuts, and more control**
